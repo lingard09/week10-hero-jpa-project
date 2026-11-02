@@ -1,5 +1,6 @@
 package com.example.jpa.week09_jpa_project.entity;
 
+import com.example.jpa.week09_jpa_project.dto.HeroRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -30,7 +31,8 @@ public class Hero {
     @Column(nullable = false, length = 100)
     private String team;
 
-    protected Hero() { } // JPA uses the no-args constructor.
+    protected Hero() {
+    } // JPA uses the no-args constructor.
 
     public Hero(HeroRequest request) {
         this.name = request.name();
@@ -48,11 +50,28 @@ public class Hero {
         this.team = request.team();
     }
 
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public String getRole() { return role; }
-    public Integer getHealth() { return health; }
-    public String getCountry() { return country; }
-    public String getTeam() { return team; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public Integer getHealth() {
+        return health;
+    }
+
+    public String getCountry() {
+        return country;
+    }
+
+    public String getTeam() {
+        return team;
+    }
 
 }

@@ -1,8 +1,8 @@
-package com.example.jpa.week09_jpa_project.controller;
+package com.example.jpa.week10_jpa_project.controller;
 
-import com.example.jpa.week09_jpa_project.dto.HeroRequest;
-import com.example.jpa.week09_jpa_project.dto.HeroResponse;
-import com.example.jpa.week09_jpa_project.service.HeroService;
+import com.example.jpa.week10_jpa_project.dto.HeroRequest;
+import com.example.jpa.week10_jpa_project.dto.HeroResponse;
+import com.example.jpa.week10_jpa_project.service.HeroService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

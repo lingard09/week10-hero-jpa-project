@@ -1,9 +1,9 @@
-package com.example.jpa.week09_jpa_project.service;
+package com.example.jpa.week10_jpa_project.service;
 
-import com.example.jpa.week09_jpa_project.dto.HeroRequest;
-import com.example.jpa.week09_jpa_project.dto.HeroResponse;
-import com.example.jpa.week09_jpa_project.entity.Hero;
-import com.example.jpa.week09_jpa_project.repository.HeroRepository;
+import com.example.jpa.week10_jpa_project.dto.HeroRequest;
+import com.example.jpa.week10_jpa_project.dto.HeroResponse;
+import com.example.jpa.week10_jpa_project.entity.Hero;
+import com.example.jpa.week10_jpa_project.repository.HeroRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;

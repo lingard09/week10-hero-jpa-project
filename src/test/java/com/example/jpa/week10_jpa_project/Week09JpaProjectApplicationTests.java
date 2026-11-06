@@ -1,4 +1,4 @@
-package com.example.jpa.week09_jpa_project;
+package com.example.jpa.week10_jpa_project;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

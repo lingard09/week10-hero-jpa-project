@@ -1,6 +1,6 @@
-package com.example.jpa.week09_jpa_project.dto;
+package com.example.jpa.week10_jpa_project.dto;
 
-import com.example.jpa.week09_jpa_project.entity.Hero;
+import com.example.jpa.week10_jpa_project.entity.Hero;
 
 public record HeroResponse(Long id, String name, String role, Integer health, String country, String team) {
     public static HeroResponse from(Hero hero) {

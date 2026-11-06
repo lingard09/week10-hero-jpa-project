@@ -1,6 +1,6 @@
-package com.example.jpa.week09_jpa_project.entity;
+package com.example.jpa.week10_jpa_project.entity;
 
-import com.example.jpa.week09_jpa_project.dto.HeroRequest;
+import com.example.jpa.week10_jpa_project.dto.HeroRequest;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

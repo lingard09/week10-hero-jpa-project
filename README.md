@@ -1,249 +1,156 @@
 # Overwatch Heroes API (Week 10 JPA)
-
-GitHub Repository: https://github.com/2026-2-WebService/assign09-c01-22100159
-
-Render Deployment: https://backend-jpa-project-hero.onrender.com (API: https://backend-jpa-project-hero.onrender.com/api/heroes)
+Spring Data JPA 응용 및 기능 확장
 
 ## 1. 프로젝트 소개
+| 구분 | 링크 |
+|---|---|
+| GitHub Repository | [assign10-c01-22100159](https://github.com/2026-2-WebService/assign10-c01-22100159) |
+| Render Deployment | [배포 서버](https://week10-hero-jpa-project.onrender.com) |
+| API | [영웅 전체 조회](https://week10-hero-jpa-project.onrender.com/api/heroes) |
 
-오버워치 영웅 정보를 등록, 조회, 수정, 삭제할 수 있는 REST API를 만들었다. Spring Data JPA로 MariaDB에 저장하고 Render에 Docker로 배포했다. 없는 id를 조회하면 404, 필수값이 비어 있으면 400이 나오도록 했다.
+9주차에 만든 오버워치 영웅 CRUD API를 기반으로 검색과 정렬, Dirty Checking을 이용한 수정, Auditing을 이용한 생성·수정 시간 자동 기록 기능을 추가했다. Spring Data JPA로 MariaDB에 데이터를 저장하고 Render에 Docker로 배포했다.
 
-Entity는 Hero이고 테이블 이름은 heroes로 정했다. 필드는 id(Long), name(String), role(String), health(Integer), country(String), team(String) 이렇게 6개다. id는 PK이고 AUTO_INCREMENT로 생성되며, 나머지 5개는 모두 NOT NULL로 설정했다.
+Entity는 Hero이고 테이블 이름은 heroes이다. 기존 id, name, role, health, country, team 필드에 createdAt과 updatedAt을 추가했다. 요청에는 영웅 정보만 보내고, 날짜는 서버에서 자동으로 기록하도록 했다.
 
-구조는 Controller → Service → JpaRepository → Hibernate → MariaDB 순서이다. 패키지는 controller, service, repository, entity, dto로 나눴고 dto에는 요청용 HeroRequest와 응답용 HeroResponse를 record로 만들었다.
+구조는 Controller → Service → JpaRepository → Hibernate → MariaDB 순서이다. 요청용 HeroRequest와 응답용 HeroResponse를 분리했고, 응답 DTO에 날짜 필드를 추가해서 Postman에서도 기록된 시간을 확인할 수 있게 했다.
 
-개발 환경은 JDK 17, Gradle, Spring Boot 4.1.2(샘플은 3.5.6), Spring Data JPA(Hibernate 7.4), MariaDB, DBeaver, Postman, IntelliJ, Docker, Render를 사용했다.
+개발에는 JDK 17, Gradle, Spring Boot, Spring Data JPA, MariaDB, IntelliJ, Postman, Docker, Render를 사용했다. 이번 작업에서는 IntelliJ의 Database 콘솔로 DB 구조를 확인하고 날짜 컬럼을 추가했다.
 
-## 2. Database SQL Practice
+## 2. 주요 구현 내용 및 결과
 
-먼저 지난 수업에서 만든 book 테이블에 데이터를 하나 추가하고 조회했다. id를 넣지 않았는데도 AUTO_INCREMENT 때문에 6번이 자동으로 들어갔다.
+### 2-1. Query Method 검색 및 정렬
+
+HeroRepository에 Query Method 3개를 선언하고 Service와 Controller에 연결했다. 기존 CRUD API는 유지했다.
+
+| Query Method | 검색 조건 | GET 요청 경로 |
+|---|---|---|
+| findByRole | 역할이 일치하는 영웅 | `/api/heroes/search/role?role=Attack` |
+| findByRoleAndCountry | 역할과 국가가 모두 일치하는 영웅 | `/api/heroes/search/role-country?role=Attack&country=Japan` |
+| findByRoleOrderByHealthDesc | 역할이 일치하는 영웅을 체력 내림차순으로 정렬 | `/api/heroes/search/role-health?role=Attack` |
+
+Postman으로 세 검색 API를 호출하고 결과를 확인했다. 단일 조건 검색에서는 역할을, 복합 조건 검색에서는 역할과 국가를 함께 확인했다. 정렬 검색에서는 응답의 health 값이 큰 값부터 나오는지 확인했다.
+
+실행 결과 (로컬 Postman)
+
+**단일 조건 — 역할 검색**
+
+`role=Attack`으로 요청하여 200 OK를 받았다. 응답에서 Tracer, TestGenji, TestTracer, TestHanzo의 role이 Attack인 것을 확인했다.
+
+![역할 검색: Attack 조건과 200 OK 응답](images/week10-search-role.png)
+
+**복합 조건 — 역할과 국가 검색**
+
+`role=Attack&country=Japan`으로 요청하여 200 OK를 받았다. 두 조건을 모두 만족하는 TestGenji와 TestHanzo가 조회됐다.
+
+![역할과 국가 검색: Attack 및 Japan 조건의 결과](images/week10-search-role-country.png)
+
+**정렬 — 역할별 체력 내림차순**
+
+`role=Attack`으로 정렬 API를 호출하여 200 OK를 받았다. 응답에서 TestGenji(250), TestHanzo(225), Tracer(175), TestTracer(175) 순으로 체력이 내림차순인 것을 확인했다. 같은 체력끼리의 순서는 별도로 지정하지 않았다.
+
+![체력 내림차순 검색: 250, 225, 175, 175 순서](images/week10-search-role-health.png)
+
+검색 결과가 여러 개일 수 있으므로 List로 반환했다. 첫 번째와 두 번째 검색은 정렬 조건이 없으므로 결과 순서를 기준으로 판단하지 않았다.
+
+### 2-2. Dirty Checking을 이용한 수정
+
+기존 수정 메서드는 엔티티 조회 후 값을 변경하고 repository.save()를 호출했다. 이번에는 수정 메서드에 @Transactional을 적용하고, 조회한 엔티티의 필드만 변경하도록 바꿨다. 수정 메서드에서 repository.save()를 호출하지 않는다.
+
+Postman에서 PUT 요청으로 값을 변경하고 GET으로 다시 조회해서 수정 결과를 확인했다. PUT 응답만 보는 대신 다시 조회해서 저장 여부를 확인했다.
+
+- 수정 대상: ID 10, Fire
+- 변경한 값: team을 `Talon`에서 `Overwatch`로 변경
+- PUT `/api/heroes/10`: 200 OK, 응답의 team이 Overwatch로 변경됨
+- GET `/api/heroes/10` 재조회: 200 OK, team이 Overwatch로 유지됨
+- DB 확인 결과는 아래 Auditing 항목의 통합 조회 결과에 함께 정리한다.
+
+![Dirty Checking 수정 요청: ID 10의 team을 Overwatch로 변경](images/week10-dirty-checking-put.png)
+
+![수정 후 GET 재조회: 변경된 team과 날짜 확인](images/week10-auditing-after-update.png)
+
+### 2-3. Auditing을 이용한 시간 자동 기록
+
+@EnableJpaAuditing으로 기능을 활성화하고 Hero에 AuditingEntityListener를 등록했다. createdAt에는 @CreatedDate, updatedAt에는 @LastModifiedDate를 적용했다. createdAt에는 updatable = false도 설정했다.
+
+새 영웅을 등록할 때 요청 JSON에는 날짜를 보내지 않았다. 등록 후 생성 시간과 수정 시간이 자동으로 기록되는지 확인했고, 기존 데이터를 수정한 뒤 다시 조회해서 생성 시간은 유지되고 수정 시간은 변경되는지 확인했다.
+
+ID 10(Fire)의 등록 및 수정 후 조회 결과는 다음과 같다. 아래 캡처는 로컬 서버에서 실행한 결과이다.
+
+| 확인 시점 | createdAt | updatedAt |
+|---|---|---|
+| POST 등록 후 (201 Created) | 2026-11-09T17:26:18.761554 | 2026-11-09T17:26:18.761554 |
+| PUT 후 GET 재조회 (200 OK) | 2026-11-09T17:26:18.761554 | 2026-11-09T17:26:43.425208 |
+
+날짜를 포함하지 않은 등록 요청에서도 두 시간이 자동으로 기록됐다. team을 변경한 뒤 재조회하니 생성 시간은 유지되고 수정 시간만 변경됐다.
+
+![Auditing 등록 결과: 날짜 입력 없이 생성 및 수정 시간 자동 기록](images/week10-auditing-create.png)
+
+수정 후 응답은 위의 GET 재조회 캡처에서 확인할 수 있다.
+
+추가로 ID 9(Jin)의 GET 응답에서도 생성 시간과 이후 수정 시간이 기록된 것을 확인했다.
+
+![ID 9 조회 결과: 생성 시간과 수정 시간](images/week10-auditing-hero9.png)
+
+**DB 조회 결과 — Dirty Checking·Auditing 통합 확인**
 
 ```sql
-INSERT INTO book (title, author, price, category) VALUES ('WWW', 'Ho', 20000, 'Internet');
-SELECT * FROM book;
+SELECT id, name, team, created_at, updated_at
+FROM heroes
+WHERE id = 10;
 ```
 
-![기존 테이블 데이터 추가](images/step1-insert-select.png)
+![DB 조회 결과: ID 10의 team 및 생성·수정 시간](img.png)
 
-그 다음 movie_sql 테이블을 새로 만들었다.
+DB에서 ID 10(Fire)의 team이 Overwatch로 저장된 것을 확인했다. created_at은 등록 시각인 2026-11-09 17:26:18.761554로 유지됐고, updated_at은 2026-11-09 17:26:43.425208로 변경됐다. DB 조회 결과가 Postman의 수정 후 GET 응답과 일치했다.
 
-```sql
-CREATE TABLE movie_sql (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    director VARCHAR(100),
-    genre VARCHAR(50),
-    rating DOUBLE
-);
-```
+기존 데이터의 생성 시간은 컬럼을 추가했다고 과거 시점으로 자동 기록되지 않으므로, Auditing 검증에는 새로 등록한 데이터를 사용했다. 현재 수정 메서드는 커밋 전에 응답 DTO를 만들기 때문에 PUT 응답의 수정 시간이 이전 값일 수 있어, 수정 후 GET으로 다시 조회한 값을 기준으로 확인했다.
 
-![movie_sql 생성](images/step2-1-create-table.png)
+### 2-4. 배포 서버 실행 결과
 
-INSERT로 영화 3개를 넣었다. Parasite는 9.0으로 넣었는데 DBeaver에서는 9로 보였다.
+Render에 Docker로 배포한 후 배포 URL에서 API를 테스트했다. DB 연결 정보는 환경변수로 설정했다.
 
-```sql
-INSERT INTO movie_sql(title, director, genre, rating)
-VALUES ('Inception', 'Nolan', 'SF', 9.1), ('Interstellar', 'Nolan', 'SF', 9.3), ('Parasite', 'Bong', 'Drama', 9.0);
-```
+| 검증 항목 | 실행 결과 |
+|---|---|
+| 기존 CRUD | 배포 서버에서 영웅 등록, 전체·단건 조회, 수정, 삭제 요청이 정상 동작하는 것을 확인했다. |
+| 검색 및 정렬 | 역할 검색과 역할+국가 검색에서 조건에 맞는 영웅이 조회됐다. 체력 정렬 검색에서는 health가 내림차순으로 반환됐다. |
+| Dirty Checking | PUT으로 team을 변경한 뒤 GET으로 다시 조회하여 변경된 값이 저장된 것을 확인했다. |
+| Auditing | 날짜를 보내지 않고 등록해도 생성·수정 시간이 기록됐다. 값을 수정한 뒤 GET으로 조회하니 생성 시간은 유지되고 수정 시간만 변경됐다. |
 
-![INSERT](images/step2-2-insert.png)
+## 3. Weekly Review
 
-UPDATE로 Interstellar의 rating을 9.3에서 9.5로 바꿨다.
+### Key Learning
 
-```sql
-UPDATE movie_sql SET rating = 9.5 WHERE title = 'Interstellar';
-```
+- Query Method의 이름에 엔티티 필드와 And, OrderBy, Desc 등을 조합하면 조건 검색과 정렬을 구현할 수 있다는 것을 배웠다.
+- 트랜잭션 안에서 조회한 엔티티는 변경 감지의 대상이 되므로, 필드를 바꾼 후 save()를 다시 호출하지 않아도 수정 사항을 반영할 수 있다는 것을 배웠다.
+- Auditing으로 시간을 자동 기록할 수 있지만, Entity에 필드를 추가하는 것과 실제 DB 컬럼이 준비되는 것은 함께 확인해야 한다는 것을 배웠다.
 
-![UPDATE](images/step2-3-update.png)
+### Problem & Solution
 
-DELETE로 Parasite를 지웠고 2개가 남았다.
+- POST 요청에서 400이 발생했다. 객체 하나를 받는 API에 이중 배열로 데이터를 보낸 것이 원인이었고, JSON 객체 하나만 보내도록 수정해서 해결했다.
+- Entity에 날짜 필드를 추가한 후 INSERT에서 Unknown column 'created_at' 오류가 발생했다. 실제 heroes 테이블에 날짜 컬럼이 없어서 IntelliJ의 Database 콘솔에서 created_at과 updated_at을 추가한 뒤 다시 등록했다. ddl-auto=update 설정이 있었지만 자동 변경이 반영되지 않은 정확한 원인까지는 확인하지 못했다.
+- 수정 작업 중 검색용 Service 메서드 3개가 파일에서 사라진 것을 확인하고 복원했다. 이후 검색 메서드와 Dirty Checking 수정 코드가 함께 유지되는지 확인했다.
+- Render 빌드에서 Gradle 다운로드 타임아웃이 발생했다. 다운로드 대기 시간을 60초로 늘리고 다시 배포했다.
 
-```sql
-DELETE FROM movie_sql WHERE title = 'Parasite';
-```
+### Reflection
 
-![DELETE](images/step2-4-delete.png)
+save()를 호출해야만 수정 내용이 저장된다고 생각했는데, 트랜잭션 안에서 조회한 객체의 값을 바꾸는 것만으로 DB에 반영되는 것을 확인하면서 JPA의 동작을 조금 더 이해할 수 있었다. 날짜 필드를 추가했을 때 실제 DB에는 컬럼이 없어 오류가 난 경험을 통해, 코드뿐 아니라 테이블 구조와 저장된 값까지 확인하는 것이 중요하다고 느꼈다. 다음에는 트랜잭션 도중 예외가 발생했을 때 변경 사항이 어떻게 롤백되는지도 직접 테스트해 보고 싶다.
 
-마지막으로 SELECT 3개를 실행했다. 전체 조회는 2행이 나왔고, title과 rating만 조회하면 컬럼 2개만 나왔다. genre = 'SF' 조건 조회도 2행이 나왔는데, Parasite를 지워서 남은 데이터가 전부 SF였기 때문에 전체 조회와 결과가 같았다.
+## 4. AI Usage
 
-```sql
-SELECT * FROM movie_sql;
-SELECT title, rating FROM movie_sql;
-SELECT * FROM movie_sql WHERE genre = 'SF';
-```
+### 사용 도구 및 주요 질문
 
-![SELECT 전체](images/step2-5-select-all.png)
-![SELECT 일부 컬럼](images/step2-5-select-columns.png)
-![SELECT WHERE](images/step2-5-select-where.png)
+ChatGPT(Codex)를 사용했다. JPA 어노테이션과 JpaRepository 메서드의 의미, Query Method 작성 방법, @Transactional과 Dirty Checking의 관계, Auditing 설정 방법을 질문했다. AI가 코드 예시와 주석 설명을 제시했고, 작성한 파일을 읽어 검토하는 도움을 받았다. POST 400 오류, 날짜 컬럼 누락 오류, Render의 Gradle 다운로드 타임아웃 원인 분석과 README 초안 작성에도 활용했다.
 
-## 3. Spring Data JPA 구현
+### 직접 수정하거나 검증한 부분
 
-Repository는 JpaRepository<Hero, Long>을 상속하는 인터페이스만 만들었다. 메서드를 직접 작성하지 않아도 Spring Data JPA가 구현체를 만들어 줘서 save(), findAll(), findById(), deleteById(), existsById()를 바로 쓸 수 있었다.
+제시된 코드를 직접 프로젝트에 입력하고 수정했으며, Postman 요청과 DB 작업, Git 커밋, Render 배포 및 배포 서버 테스트는 직접 진행했다. 직접 입력한 부분이라도 AI가 제공한 코드 예시와 설명을 활용한 범위는 AI 사용에 포함한다.
 
-```java
-public interface HeroRepository extends JpaRepository<Hero, Long> { }
-```
+- AI가 제시한 검색 메서드를 Hero의 role, country, health 필드에 맞춰 프로젝트에 추가하고 Service와 Controller에 연결했다. Postman에서 역할 검색, 역할+국가 검색, 체력 내림차순 결과를 확인했다.
+- 수정 메서드에 @Transactional을 적용하고 repository.save() 호출을 제거했다. ID 10의 team을 Talon에서 Overwatch로 변경한 뒤 GET 재조회와 DB 조회로 저장된 값을 확인했다.
+- Auditing 설정과 날짜 필드, 응답 DTO를 추가했다. 날짜를 보내지 않고 등록한 뒤 수정해 보면서 createdAt이 유지되고 updatedAt만 변경되는 것을 확인했고, DB 컬럼의 값도 응답과 대조했다.
+- POST 요청을 이중 배열에서 객체 하나로 수정해 400 오류를 해결했다. 날짜 컬럼 누락 오류는 DB에 컬럼을 추가해 해결했고, Gradle 다운로드 제한 시간을 60초로 변경한 뒤 Render 재배포와 API 테스트를 진행했다.
 
-Entity에는 @Entity, @Table(name = "heroes"), @Id, @GeneratedValue(strategy = GenerationType.IDENTITY), @Column(nullable, length)을 사용했다. @Entity는 JPA가 관리하는 클래스라는 표시이고, @Table은 테이블 이름을 정한다. @Id는 기본키, @GeneratedValue의 IDENTITY는 MariaDB의 AUTO_INCREMENT를 쓰게 한다. @Column으로 NOT NULL과 varchar 길이를 정했다.
+### AI 사용 비율에 대한 자기 평가
 
-요청 DTO인 HeroRequest에는 @NotBlank, @NotNull, @Size, @PositiveOrZero를 붙였고, Controller에서 @Valid를 붙여서 검증이 실패하면 400이 나오게 했다. Controller는 @RestController와 @RequestMapping("/api/heroes")를, Service는 @Service를 사용했다.
-
-API는 5개를 만들었다. POST /api/heroes는 등록(201), GET /api/heroes는 전체 조회(200), GET /api/heroes/{id}는 단건 조회(200, 없으면 404), PUT /api/heroes/{id}는 수정(200, 없으면 404), DELETE /api/heroes/{id}는 삭제(204, 없으면 404)이다.
-
-요청 예시
-
-```json
-{
-  "name": "Genji",
-  "role": "Attack",
-  "health": 250,
-  "country": "Japan",
-  "team": "Overwatch"
-}
-```
-
-응답 예시 (201 Created)
-
-```json
-{
-  "id": 1,
-  "name": "Genji",
-  "role": "Attack",
-  "health": 250,
-  "country": "Japan",
-  "team": "Overwatch"
-}
-```
-
-Spring Boot를 실행하니 heroes 테이블이 자동으로 만들어졌다. Long id는 bigint(20), Integer health는 int(11), length = 100인 String은 varchar(100), role은 varchar(50)이 되었고 nullable = false로 한 컬럼은 NOT NULL이 걸렸다. 코드에서는 name, role, health, country, team 순서로 썼는데 테이블은 id 다음에 country, health, name, role, team 순서(알파벳순)로 만들어졌다.
-
-![heroes 테이블](images/step3-heroes-table.png)
-
-## 4. JPA와 SQL 비교
-
-Postman으로 로컬에서 CRUD를 테스트했다. POST로 Genji를 등록하니 201과 함께 id 1이 나왔다.
-
-![POST](images/step6-1-post.png)
-
-전체 조회와 단건 조회는 200이 나왔다.
-
-![GET 전체](images/step6-2-get-all.png)
-![GET 단건](images/step6-3-get-one.png)
-
-PUT으로 team을 Overwatch에서 Talon으로 바꾸고 다시 조회해서 바뀐 것을 확인했다.
-
-![PUT](images/step6-4-put.png)
-![PUT 후 조회](images/step6-5-get-after-put.png)
-
-DELETE는 204가 나왔고, 다시 전체 조회하니 빈 배열이 나왔다.
-
-![DELETE](images/step6-6-delete.png)
-![DELETE 후 조회](images/step6-7-get-after-delete.png)
-
-name을 빈 문자열로 보내면 400, 삭제한 id 1을 다시 조회하면 404가 나왔다.
-
-![400](images/step6-8-post-invalid-400.png)
-![404](images/step6-9-get-deleted-404.png)
-
-IntelliJ 콘솔에서 Hibernate가 만든 SQL을 확인했다. save()로 새 객체를 저장하면 insert into heroes (country, health, name, role, team) values (?, ?, ?, ?, ?)가 실행되고, findAll()은 select ... from heroes h1_0, findById()는 where h1_0.id=? 조건이 붙은 select가 실행됐다.
-
-![Hibernate SQL](images/step6-hibernate-sql.png)
-
-PUT /api/heroes/1을 한 번 보내면 select ... where h1_0.id=?가 2번, update heroes set country=?, health=?, name=?, role=?, team=? where id=?가 1번 실행됐다. Service에 @Transactional이 없어서 findById()로 가져온 객체는 메서드가 끝나면 영속성 컨텍스트에서 빠지고, save()를 호출하면 id가 있는 객체라서 merge가 되면서 DB에서 한 번 더 select한 다음 바뀐 값을 update했다. 같은 값으로 PUT을 한 번 더 보내니 select 2번만 나오고 update는 실행되지 않았다. 바뀐 값이 없으면 Hibernate가 update를 생략한다.
-
-DELETE /api/heroes/1은 existsById()에서 select count(*) from heroes h1_0 where h1_0.id=?, deleteById()에서 select ... where h1_0.id=?와 delete from heroes where id=?가 실행돼서 SQL이 3번 나왔다. deleteById()는 바로 delete하지 않고 먼저 select로 객체를 찾은 다음 지운다. 없는 id를 DELETE하면 select count(*)만 실행되고 404가 나왔다.
-
-SQL 실습에서는 CREATE, INSERT, UPDATE, DELETE를 직접 작성했지만 JPA에서는 ddl-auto=update로 테이블이 자동으로 만들어졌고, save() 같은 메서드를 호출하면 Hibernate가 SQL을 만들어서 실행했다. 값은 ? 파라미터로 바인딩된다.
-
-JPA를 써 보니 SQL을 한 줄도 쓰지 않고 Repository 인터페이스 하나로 CRUD가 다 돼서 코드가 짧아졌고, 객체의 값만 바꾸면 update가 되는 점이 편했다. 컬럼 이름을 문자열로 쓰지 않으니 오타 걱정도 줄었다. 반대로 SQL이 눈에 보이지 않아서 실제로 어떤 쿼리가 몇 번 나가는지는 콘솔 로그를 봐야 알 수 있었고, PUT 한 번에 select가 2번이나 나가는 것처럼 직접 SQL을 쓸 때보다 쿼리가 더 많이 실행되는 경우도 있었다. 테이블 컬럼 순서도 내가 정한 대로 만들어지지 않았다. 그래서 JPA를 쓰더라도 show-sql로 실행되는 SQL을 확인하는 습관이 필요하다고 느꼈다.
-
-## 5. 배포 및 환경 설정
-
-DB 정보는 application.properties에 직접 쓰지 않고 환경변수로 받았다.
-
-```properties
-spring.datasource.url=${DB_URL}
-spring.datasource.username=${DB_USERNAME}
-spring.datasource.password=${DB_PASSWORD}
-server.port=${PORT:8080}
-```
-
-IntelliJ에서는 Run → Edit Configurations → Environment variables에 DB_URL, DB_USERNAME, DB_PASSWORD를 등록했고, Render에서는 Environment에 같은 이름으로 등록했다. PORT는 Render가 자동으로 넣어 주기 때문에 따로 설정하지 않았다. .env와 .idea는 .gitignore에 넣어서 GitHub에 올라가지 않게 했다.
-
-Dockerfile은 2단계로 만들었다. 첫 번째 단계(eclipse-temurin:17-jdk)에서 ./gradlew clean bootJar -x test로 jar를 만들고, 두 번째 단계(eclipse-temurin:17-jre)에는 jar만 복사해서 실행한다. 테스트(contextLoads)는 DB 연결이 필요해서 빌드할 때는 제외했다. .dockerignore로 .git, build, .idea, .env, images 같은 파일은 빌드에 포함되지 않게 했다.
-
-Render 배포는 다음 순서로 했다.
-
-1. Dockerfile과 .dockerignore를 커밋하고 GitHub에 push했다.
-2. Render에서 New → Web Service를 누르고 GitHub 저장소를 연결했다.
-3. Language는 Docker, Branch는 main으로 선택했다. Render가 저장소의 Dockerfile을 찾아서 이미지를 빌드한다.
-4. Environment에 DB_URL, DB_USERNAME, DB_PASSWORD를 등록했다.
-5. Deploy를 누르고 로그에서 Gradle 빌드와 Spring Boot 실행이 끝난 뒤 Your service is live가 나오는 것을 확인했다.
-6. 발급된 주소 https://backend-jpa-project-hero.onrender.com 뒤에 /api/heroes를 붙여서 Postman으로 테스트했다.
-
-배포 URL에서도 Postman으로 테스트했다. POST로 Tracer를 등록하니 201과 id 3이 나왔고, 전체 조회에서 Genji(id 2)와 Tracer(id 3)가 나왔다.
-
-![Render POST](images/step7-1-render-post.png)
-![Render GET](images/step7-2-render-get-all.png)
-
-DBeaver에서 heroes 테이블을 조회해서 Render로 등록한 Tracer가 실제로 MariaDB에 저장된 것을 확인했다.
-
-![Render POST 후 DBeaver](images/step7-3-dbeaver-after-post.png)
-
-PUT /api/heroes/2로 Genji의 team을 Talon에서 UDT로 바꿨고, DELETE /api/heroes/2는 204가 나왔다. DBeaver에서 다시 조회하니 Tracer만 남아 있었다.
-
-![Render PUT](images/step7-4-render-put.png)
-![Render DELETE](images/step7-5-render-delete.png)
-![Render DELETE 후 DBeaver](images/step7-6-dbeaver-after-delete.png)
-
-발생한 문제와 해결
-
-Postman에서 POST를 보냈는데 404가 나왔다. URL 칸에는 /api/heroes로 되어 있었는데 응답의 path는 /api/heroes/로 끝에 슬래시가 붙어 있었다. Spring Boot 3부터는 끝에 슬래시가 붙은 주소를 다른 경로로 보기 때문에 404가 났다. 정확히 왜 슬래시가 붙었는지는 모르겠지만 요청을 새로 만들어서 보내니 해결됐다.
-
-HeroRequest에 @NotBlank 같은 검증 어노테이션을 붙였는데 클래스를 찾지 못했다. spring-boot-starter-validation 의존성이 없어서였고, build.gradle에 추가하고 Gradle을 새로고침해서 해결했다.
-
-@NotNull을 import할 때 IntelliJ가 org.antlr 패키지의 NotNull을 자동으로 골랐다. 검증 기능이 없는 클래스라서 jakarta.validation.constraints.NotNull로 바꿨다.
-
-Hero와 HeroRepository에서 cannot find symbol 에러가 났는데, 다른 패키지에 있는 클래스를 import하지 않아서였다.
-
-POST 응답의 Location 헤더가 /api/books/{id}로 되어 있었다. 샘플 코드를 가져오면서 경로를 안 바꿨던 것이라 /api/heroes/{id}로 수정했다.
-
-Render 배포 중 생긴 문제는 없었다.
-
-## 6. Weekly Report
-
-Key Learning
-
-- JpaRepository를 상속만 해도 save, findAll, findById, deleteById 같은 CRUD 메서드를 바로 쓸 수 있다.
-- @Entity, @Id, @GeneratedValue, @Column으로 클래스를 테이블에 연결하고, ddl-auto=update로 테이블이 자동으로 만들어지는 것을 확인했다.
-- JPA 메서드 하나가 SQL 하나와 같지 않다. PUT은 select 2번 + update 1번, DELETE는 select count + select + delete로 실행됐다.
-- 요청 DTO에 검증 어노테이션을 붙이고 @Valid를 쓰면 잘못된 입력에 400을 돌려줄 수 있고, ResponseStatusException으로 없는 데이터에 404를 돌려줄 수 있다.
-- DB 접속 정보를 환경변수로 빼면 코드를 바꾸지 않고 로컬(IntelliJ)과 Render에서 같은 코드를 실행할 수 있다.
-
-Problem & Solution
-
-- Postman POST 404: 요청 경로 끝에 슬래시가 붙어서(/api/heroes/) 매핑이 안 됐다. 요청을 새로 만들어서 해결했다.
-- 검증 어노테이션을 찾지 못함: spring-boot-starter-validation 의존성을 build.gradle에 추가했다.
-- @NotNull이 org.antlr 패키지로 import됨: jakarta.validation.constraints.NotNull로 바꿨다.
-- cannot find symbol: 다른 패키지 클래스의 import를 추가했다.
-- Location 헤더가 /api/books/{id}로 나옴: 샘플 코드의 경로를 /api/heroes/{id}로 고쳤다.
-
-Code Review
-
-```java
-private Hero findEntity(Long id) {
-    return repository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Hero not found: " + id));
-}
-```
-찾는 영웅이 없을 때 예외처리를 통해 http 처리를 한다.
-
-AI Usage
-
-Claude(Claude Code)를 사용했다. 단계별 진행 순서와 힌트, 작성한 코드 리뷰와 컴파일 확인, build.gradle의 validation 의존성 추가, .dockerignore 작성, DBeaver 스크린샷 계정 정보 모자이크와 파일 이름 정리, Postman 테스트용 JSON, README 초안 작성(교수님 공지에 따라 AI 초안 작성 후 직접 수정)에 AI를 사용했다. DBeaver SQL 실습, Entity / DTO / Repository / Service / Controller 작성과 수정, 컴파일 에러 수정, Postman 테스트, Git 커밋, Render 배포는 직접 했다.
-
-AI 사용률: 34 %
-
-Reflection
-직접 프론트엔드와 소통하는 것을 구현해보고싶다.
+- AI 사용률: 38%
+- 주석 설명과 오류 해결을 위해 AI를 사용하여 공부를 하고 이해한 바를 작성하였다.

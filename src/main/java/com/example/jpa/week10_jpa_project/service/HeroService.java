@@ -6,6 +6,7 @@ import com.example.jpa.week10_jpa_project.entity.Hero;
 import com.example.jpa.week10_jpa_project.repository.HeroRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class HeroService {
 
     public HeroResponse create(HeroRequest request) {
         // Q7: 새 Hero의 id는 null이므로 새 엔티티로 판단해서 persist()로 영속화하여 DB에 INSERT가 실행
+        // Q7: “save()에 전달한 엔티티의 id가 있으면 기존 엔티티로 판단해서 merge()로 상태를 영속성 컨텍스트에 병합. 변경 내용이 있으면 DB에 UPDATE가 실행
         Hero saved = repository.save(new Hero(request)); // INSERT
         return HeroResponse.from(saved);
     }
@@ -53,11 +55,13 @@ public class HeroService {
         return HeroResponse.from(findEntity(id));
     }
 
+    // Q8: Transactional은 조회부터 변경까지 하나의 트랜잭션으로 묶어 주는 역할
+    // Q8: 트랜잭션 안에서 조회한 엔티티의 변경을 Hibernate가 감지해서 커밋 시 DB에 반영하므로 save()를 다시 호출하지 않아도 됨.
+    @Transactional
     public HeroResponse update(Long id, HeroRequest request) {
         Hero hero = findEntity(id);
         hero.update(request);
-        // Q7: 조회한 hero는 id가 있으므로 기존 엔티티로 판단해서 merge()로 상태를 영속성 컨텍스트에 병합. 변경 내용이 있으면 DB에 UPDATE가 실행
-        return HeroResponse.from(repository.save(hero));
+        return HeroResponse.from(hero);
     }
 
     public void delete(Long id) {

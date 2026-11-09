@@ -3,6 +3,8 @@ package com.example.jpa.week10_jpa_project.repository;
 import com.example.jpa.week10_jpa_project.entity.Hero;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+
 public interface HeroRepository extends JpaRepository<Hero, Long>  { // Hero는 이 Repository가 관리하는 엔티티 타입, Long은 그 엔티티의 기본키 타입
     // JpaRepository에서 기본 제공하는 CRUD 메서드
         // save(entity) - 새 엔티티를 저장하거나 기존 엔티티의 상태를 병합
@@ -14,4 +16,13 @@ public interface HeroRepository extends JpaRepository<Hero, Long>  { // Hero는 
         // deleteById(id) - 해당 기본키의 엔티티 삭제
 
     // 기본 메서드와 직접 선언하는 Query Method의 차이 - 기본 CRUD 메서드는 JpaRepository를 상속하면 바로 사용 가능. 반면 findByRole(String role) 같은 Query Method는 엔티티 필드에 맞춰 개발자가 메서드를 선언하면 Spring Data JPA가 이름을 해석해 쿼리를 생성.
+
+    // 단일 조건: 역할이 일치하는 영웅 검색
+    List<Hero> findByRole(String role);
+
+    // 복합 조건: 역할과 국가가 모두 일치하는 영웅 검색
+    List<Hero> findByRoleAndCountry(String role, String country);
+
+    // 정렬: 역할이 일치하는 영웅을 체력이 높은 순서로 검색
+    List<Hero> findByRoleOrderByHealthDesc(String role);
 }

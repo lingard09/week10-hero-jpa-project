@@ -19,6 +19,7 @@ public class HeroService {
     }
 
     public HeroResponse create(HeroRequest request) {
+        // Q7: 새 Hero의 id는 null이므로 새 엔티티로 판단해서 persist()로 영속화하여 DB에 INSERT가 실행
         Hero saved = repository.save(new Hero(request)); // INSERT
         return HeroResponse.from(saved);
     }
@@ -34,6 +35,7 @@ public class HeroService {
     public HeroResponse update(Long id, HeroRequest request) {
         Hero hero = findEntity(id);
         hero.update(request);
+        // Q7: 조회한 hero는 id가 있으므로 기존 엔티티로 판단해서 merge()로 상태를 영속성 컨텍스트에 병합. 변경 내용이 있으면 DB에 UPDATE가 실행
         return HeroResponse.from(repository.save(hero));
     }
 

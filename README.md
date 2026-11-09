@@ -1,4 +1,4 @@
-# Overwatch Heroes API (Week 09 JPA)
+# Overwatch Heroes API (Week 10 JPA)
 
 GitHub Repository: https://github.com/2026-2-WebService/assign09-c01-22100159
 

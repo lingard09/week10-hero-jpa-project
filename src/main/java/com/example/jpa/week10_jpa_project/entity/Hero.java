@@ -8,12 +8,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-
-@Entity
-@Table(name = "heroes")
+@Entity // 이 클래스를 JPA가 관리할 엔티티로 지정
+@Table(name = "heroes") // Hero를 DB의 heroes 테이블과 연결
 public class Hero {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id // id 필드가 각 행을 구분하는 기본키임을 표시
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // MariaDB의 AUTO_INCREMENT처럼 DB가 생성한 기본키 값을 사용
     private Long id;
 
     @Column(nullable = false, length = 100)

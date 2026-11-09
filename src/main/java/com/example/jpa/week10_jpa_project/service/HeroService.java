@@ -28,6 +28,27 @@ public class HeroService {
         return repository.findAll().stream().map(HeroResponse::from).toList();
     }
 
+    public List<HeroResponse> findByRole(String role) {
+        return repository.findByRole(role)
+                .stream()
+                .map(HeroResponse::from)
+                .toList();
+    }
+
+    public List<HeroResponse> findByRoleAndCountry(String role, String country) {
+        return repository.findByRoleAndCountry(role, country)
+                .stream()
+                .map(HeroResponse::from)
+                .toList();
+    }
+
+    public List<HeroResponse> findByRoleOrderByHealthDesc(String role) {
+        return repository.findByRoleOrderByHealthDesc(role)
+                .stream()
+                .map(HeroResponse::from)
+                .toList();
+    }
+
     public HeroResponse findById(Long id) {
         return HeroResponse.from(findEntity(id));
     }

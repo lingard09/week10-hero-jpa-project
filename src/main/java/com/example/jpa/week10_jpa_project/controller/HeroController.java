@@ -26,6 +26,23 @@ public class HeroController {
     @GetMapping
     public List<HeroResponse> findAll() { return service.findAll(); }
 
+    @GetMapping("/search/role")
+    public List<HeroResponse> findByRole(@RequestParam String role) {
+        return service.findByRole(role);
+    }
+
+    @GetMapping("/search/role-country")
+    public List<HeroResponse> findByRoleAndCountry(
+            @RequestParam String role,
+            @RequestParam String country) {
+        return service.findByRoleAndCountry(role, country);
+    }
+
+    @GetMapping("/search/role-health")
+    public List<HeroResponse> findByRoleOrderByHealthDesc(@RequestParam String role) {
+        return service.findByRoleOrderByHealthDesc(role);
+    }
+
     @GetMapping("/{id}")
     public HeroResponse findById(@PathVariable Long id) { return service.findById(id); }
 
